@@ -3,8 +3,10 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 let players = {};
+let bullets = [];
 let myId;
 const keysPressed = {};
+const invincibilityDuration = 5000; // 5 segundos
 
 socket.on('requestUsername', () => {
     const username = prompt('Please enter your username:');
@@ -37,6 +39,28 @@ socket.on('playerMoved', (player) => {
     if (players[player.id]) {
         players[player.id].x = player.x;
         players[player.id].y = player.y;
+        players[player.id].angle = player.angle;
+        drawPlayers();
+    }
+});
+
+socket.on('bulletShot', (bullet) => {
+    bullets.push(bullet);
+});
+
+socket.on('updateBullets', (serverBullets) => {
+    bullets = serverBullets;
+    drawPlayers();
+});
+
+socket.on('playerRespawned', (player) => {
+    if (players[player.id]) {
+        players[player.id].x = player.x;
+        players[player.id].y = player.y;
+        players[player.id].invincible = true;
+        setTimeout(() => {
+            players[player.id].invincible = false;
+        }, invincibilityDuration);
         drawPlayers();
     }
 });
@@ -44,22 +68,25 @@ socket.on('playerMoved', (player) => {
 document.getElementById('startGameButton').addEventListener('click', () => {
     document.getElementById('gameOptions').style.display = 'none';
     canvas.style.display = 'block';
-    window.addEventListener('keydown', handleMovement);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 });
 
-// Teclas
-window.addEventListener('keydown', (event) => {
-    keysPressed[event.key] = true; // Marcar la tecla como presionada
-    handleMovement(); // Actualizar el movimiento
-});
+function handleKeyDown(event) {
+    keysPressed[event.key] = true;
+    handleMovement();
+    if (event.key === ' ') {
+        shoot();
+    }
+}
 
-window.addEventListener('keyup', (event) => {
-    delete keysPressed[event.key]; // Eliminar la tecla de las teclas presionadas
-    handleMovement(); // Actualizar el movimiento
-});
+function handleKeyUp(event) {
+    delete keysPressed[event.key];
+    handleMovement();
+}
 
 function startGame(x, y) {
-    players[socket.id] = { x, y };
+    players[socket.id] = { x, y, angle: 0, invincible: false };
     drawPlayers();
 }
 
@@ -67,63 +94,102 @@ function drawPlayers() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (const id in players) {
         const player = players[id];
-        drawShip(player.x, player.y, player.username);
+        drawShip(player.x, player.y, player.username, player.angle, player.invincible);
     }
+
+    bullets.forEach((bullet) => {
+        drawBullet(bullet.x, bullet.y);
+    });
 }
 
-function drawShip(x, y, username, dx, dy) {
-    // No sirve xd
-    const angle = Math.atan2(dy, dx);
-
-    // Dibujar la nave
-    ctx.save(); // Guardar el estado actual del contexto
-    ctx.translate(x, y); // Mover el origen al centro de la nave
-    ctx.rotate(angle); // Rotar el contexto según el ángulo de rotación, tampoco sirve joa
-    ctx.fillStyle = 'blue';
+function drawShip(x, y, username, angle, invincible) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.fillStyle = invincible ? 'rgba(0, 0, 255, 0.5)' : 'blue';
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-10, 20);
-    ctx.lineTo(10, 20);
+    ctx.moveTo(0, -10);
+    ctx.lineTo(-10, 10);
+    ctx.lineTo(10, 10);
     ctx.closePath();
     ctx.fill();
-
-    // Restaurar el estado del contexto
     ctx.restore();
 
-    // Dibujar el nombre del jugador sobre la nave
     ctx.fillStyle = 'black';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(username, x, y - 10);
+    ctx.fillText(username, x, y - 20);
 }
 
+function drawBullet(x, y) {
+    ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, 2 * Math.PI);
+    ctx.fill();
+}
 
 function handleMovement() {
-    const movement = { dx: 0, dy: 0 };
+    const player = players[socket.id];
+    if (!player) return;
+
+    const movement = { dx: 0, dy: 0, angle: player.angle };
     const speed = 5;
 
-    // Determinar la dirección del movimiento basada en las teclas presionadas
     if (keysPressed['ArrowUp']) {
         movement.dy -= speed;
+        movement.angle = 0;
     }
     if (keysPressed['ArrowDown']) {
         movement.dy += speed;
+        movement.angle = Math.PI;
     }
     if (keysPressed['ArrowLeft']) {
         movement.dx -= speed;
+        movement.angle = -Math.PI / 2;
     }
     if (keysPressed['ArrowRight']) {
         movement.dx += speed;
+        movement.angle = Math.PI / 2;
     }
 
-    // Normalizar el movimiento diagonal para mantener la velocidad constante
     if ((keysPressed['ArrowUp'] || keysPressed['ArrowDown']) && (keysPressed['ArrowLeft'] || keysPressed['ArrowRight'])) {
-        movement.dx *= 0.7071; // Dividir por la raíz cuadrada de 2 para mantener la velocidad constante en diagonales
+        movement.dx *= 0.7071;
         movement.dy *= 0.7071;
+        if (keysPressed['ArrowUp'] && keysPressed['ArrowLeft']) movement.angle = -Math.PI / 4;
+        if (keysPressed['ArrowUp'] && keysPressed['ArrowRight']) movement.angle = Math.PI / 4;
+        if (keysPressed['ArrowDown'] && keysPressed['ArrowLeft']) movement.angle = -3 * Math.PI / 4;
+        if (keysPressed['ArrowDown'] && keysPressed['ArrowRight']) movement.angle = 3 * Math.PI / 4;
     }
 
-    // Enviar el movimiento al servidor
-    if (movement.dx !== 0 || movement.dy !== 0) {
-        socket.emit('move', movement);
+    const newX = player.x + movement.dx;
+    const newY = player.y + movement.dy;
+
+    if (newX >= 0 && newX <= canvas.width && newY >= 0 && newY <= canvas.height) {
+        players[socket.id].x = newX;
+        players[socket.id].y = newY;
+        players[socket.id].angle = movement.angle;
+        socket.emit('move', { x: newX, y: newY, angle: movement.angle });
     }
 }
+
+function shoot() {
+    const player = players[socket.id];
+    if (player) {
+        const bullet = {
+            x: player.x,
+            y: player.y,
+            dx: Math.cos(player.angle) * 10,
+            dy: Math.sin(player.angle) * 10,
+            id: socket.id,
+        };
+        socket.emit('shoot', bullet);
+    }
+}
+
+function gameLoop() {
+    handleMovement();
+    drawPlayers();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
