@@ -1,12 +1,55 @@
 body {
+    margin: 0;
     font-family: Arial, sans-serif;
+    background-image: url('../sources/fondo3.png');
+    background-size: cover;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100vh;
-    margin: 0;
+    color: white;
 }
+
+#welcomeMessage {
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+/* Estilo para el label */
+label {
+    display: block;
+    margin-bottom: 10px;
+    color: white;
+    font-size: 18px;
+}
+
+/* Estilo para el input */
+input[type="text"] {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+/* Estilo para el botón */
+button {
+    padding: 10px 20px;
+    font-size: 16px;
+    border: none;
+    border-radius: 5px;
+    background-color: #4CAF50; /* Color verde */
+    color: white;
+    cursor: pointer;
+}
+
+/* Cambiar el color del botón cuando se pasa el mouse */
+button:hover {
+    background-color: #45a049;
+}
+
+
 #gameCanvas {
+    border: 1px solid #000;
     display: none;
 }
