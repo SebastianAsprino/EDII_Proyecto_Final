@@ -9,8 +9,8 @@ const io = socketIo(server);
 
 const players = {};
 const bullets = [];
-const canvasWidth = 1270;
-const canvasHeight = 720;
+const canvasWidth = 1024;
+const canvasHeight = 500;
 const invincibilityDuration = 5000; // 5 segundos para reaparición
 const preparationDuration = 10000; // 10 segundos para preparación inicial
 
