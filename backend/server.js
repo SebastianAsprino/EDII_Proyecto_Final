@@ -11,7 +11,8 @@ const players = {};
 const bullets = [];
 const canvasWidth = 1270;
 const canvasHeight = 720;
-const invincibilityDuration = 5000; // 5 segundos
+const invincibilityDuration = 5000; // 5 segundos para reaparición
+const preparationDuration = 10000; // 10 segundos para preparación inicial
 
 // Servir archivos estáticos desde la carpeta 'frontend'
 app.use(express.static(join(__dirname, '../frontend')));
@@ -34,42 +35,49 @@ io.on('connection', (socket) => {
     // Assign a random position to the player
     const x = Math.random() * canvasWidth; 
     const y = Math.random() * canvasHeight;
-    players[socket.id] = { username, x, y, angle: 0, invincible: false };
+    players[socket.id] = { username, x, y, angle: 0, invincible: true };
 
     // Player pos
     socket.emit('welcome', { message: `Welcome to the game, ${username}!`, x, y });
 
     // Notify other players about the new player
-    socket.broadcast.emit('newPlayer', { id: socket.id, username, x, y, angle: 0 });
+    socket.broadcast.emit('newPlayer', { id: socket.id, username, x, y, angle: 0, invincible: true });
 
     // Send existing players to the new player
     socket.emit('existingPlayers', players);
+
+    // Handle invincibility timer
+    setTimeout(() => {
+      players[socket.id].invincible = false;
+      io.emit('updateInvincibility', { id: socket.id, invincible: false });
+    }, preparationDuration);
   });
 
   // Handle movement
   socket.on('move', (movement) => {
-    if (players[socket.id]) {
+    if (players[socket.id] && !players[socket.id].invincible) {
+      const player = players[socket.id];
       const newX = movement.x;
       const newY = movement.y;
 
       if (newX >= 0 && newX <= canvasWidth && newY >= 0 && newY <= canvasHeight) {
         players[socket.id].x = newX;
         players[socket.id].y = newY;
-        players[socket.id].angle = movement.angle; // Actualizar ángulo
+        players[socket.id].angle = movement.angle;
 
         // Notify all clients about the player's new position
-        io.emit('playerMoved', { id: socket.id, x: newX, y: newY, angle: players[socket.id].angle });
+        io.emit('playerMoved', { id: socket.id, x: newX, y: newY, angle: movement.angle });
       }
     }
   });
 
   // Handle shooting
   socket.on('shoot', (bullet) => {
-    bullets.push(bullet);
-    io.emit('bulletShot', bullet);
+    if (players[socket.id] && !players[socket.id].invincible) {
+      bullets.push(bullet);
+    }
   });
 
-  // Handle disconnect
   socket.on('disconnect', () => {
     console.log('A user disconnected');
     delete players[socket.id];
@@ -77,13 +85,11 @@ io.on('connection', (socket) => {
   });
 });
 
-// Update bullets positions and check collisions
 setInterval(() => {
   bullets.forEach((bullet, bulletIndex) => {
     bullet.x += bullet.dx;
     bullet.y += bullet.dy;
 
-    // Check collision with players
     for (const playerId in players) {
       const player = players[playerId];
       if (!player.invincible && bullet.id !== playerId) {
@@ -93,6 +99,7 @@ setInterval(() => {
           players[playerId].invincible = true;
           setTimeout(() => {
             players[playerId].invincible = false;
+            io.emit('updateInvincibility', { id: playerId, invincible: false });
           }, invincibilityDuration);
 
           bullets.splice(bulletIndex, 1);
@@ -101,7 +108,6 @@ setInterval(() => {
       }
     }
 
-    // Remove the bullet if it's out of bounds
     if (bullet.x < 0 || bullet.x > canvasWidth || bullet.y < 0 || bullet.y > canvasHeight) {
       bullets.splice(bulletIndex, 1);
     }
