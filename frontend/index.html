@@ -7,11 +7,13 @@
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
-    <div id="welcomeMessage"></div>
+    <div id="welcomeMessage">Bienvenido</div>
     <div id="gameOptions" style="display:none;">
+        <label for="playerName">Enter your name:</label>
+        <input type="text" id="playerName" name="playerName">
         <button id="startGameButton">Start Game</button>
     </div>
-    <canvas id="gameCanvas" width="1270" height="720" style="border:1px solid #000;"></canvas>
+    <canvas id="gameCanvas" width="1024" height="500" style="border:1px solid #fff4f4;"></canvas>
     <script src="/socket.io/socket.io.js"></script>
     <script src="index.js"></script>
 </body>
