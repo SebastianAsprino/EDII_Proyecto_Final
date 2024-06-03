@@ -9,15 +9,24 @@ const keysPressed = {};
 const invincibilityDuration = 5000; // 5 segundos para reaparición
 const preparationDuration = 10000; // 10 segundos para preparación inicial
 
+
 socket.on('requestUsername', () => {
-    const username = prompt('Please enter your username:');
-    socket.emit('sendUsername', username);
+    document.getElementById('gameOptions').style.display = 'block';
+});
+
+document.getElementById('startGameButton').addEventListener('click', () => {
+    const username = document.getElementById('playerName').value;
+    if (username) {
+        socket.emit('sendUsername', username);
+        document.getElementById('gameOptions').style.display = 'none';
+    } else {
+        alert('Please enter a username.');
+    }
 });
 
 socket.on('welcome', (data) => {
     myId = socket.id;
     document.getElementById('welcomeMessage').innerText = data.message;
-    document.getElementById('gameOptions').style.display = 'block';
     startGame(data.x, data.y, true);
 });
 
@@ -74,6 +83,13 @@ socket.on('updateInvincibility', (data) => {
     }
 });
 
+socket.on('updatePoints', (data) => {
+    if (players[data.id]) {
+        players[data.id].points = data.points;
+        document.getElementById('points').innerText = `Points: ${players[myId].points}`;
+    }
+});
+
 document.getElementById('startGameButton').addEventListener('click', () => {
     document.getElementById('gameOptions').style.display = 'none';
     canvas.style.display = 'block';
@@ -99,7 +115,7 @@ function handleKeyUp(event) {
 }
 
 function startGame(x, y, isFirstTime) {
-    players[socket.id] = { x, y, angle: 0, invincible: isFirstTime };
+    players[socket.id] = { x, y, angle: 0, invincible: isFirstTime, points: 0 };
     drawPlayers();
     if (isFirstTime) {
         let countdown = preparationDuration / 1000;
@@ -127,6 +143,16 @@ function drawPlayers() {
     bullets.forEach((bullet) => {
         drawBullet(bullet.x, bullet.y);
     });
+
+    ctx.fillStyle = 'white';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'left';
+    let yOffset = 20;
+    for (const id in players) {
+    const player = players[id];
+    ctx.fillText(`${player.username}: ${player.points} points`, 10, yOffset);
+    yOffset += 20;
+}
 }
 
 function drawShip(x, y, username, angle, invincible) {
@@ -142,7 +168,7 @@ function drawShip(x, y, username, angle, invincible) {
     ctx.fill();
     ctx.restore();
 
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = 'white';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(username, x, y - 20);
@@ -160,7 +186,7 @@ function handleMovement() {
     if (!player || player.invincible) return;
 
     const movement = { dx: 0, dy: 0, angle: player.angle };
-    const speed = 5;
+    const speed = 3;
 
     if (keysPressed['ArrowUp']) {
         movement.dy -= speed;
