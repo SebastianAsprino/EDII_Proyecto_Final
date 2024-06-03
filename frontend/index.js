@@ -6,7 +6,8 @@ let players = {};
 let bullets = [];
 let myId;
 const keysPressed = {};
-const invincibilityDuration = 5000; // 5 segundos
+const invincibilityDuration = 5000; // 5 segundos para reaparición
+const preparationDuration = 10000; // 10 segundos para preparación inicial
 
 socket.on('requestUsername', () => {
     const username = prompt('Please enter your username:');
@@ -17,7 +18,7 @@ socket.on('welcome', (data) => {
     myId = socket.id;
     document.getElementById('welcomeMessage').innerText = data.message;
     document.getElementById('gameOptions').style.display = 'block';
-    startGame(data.x, data.y);
+    startGame(data.x, data.y, true);
 });
 
 socket.on('newPlayer', (player) => {
@@ -60,7 +61,15 @@ socket.on('playerRespawned', (player) => {
         players[player.id].invincible = true;
         setTimeout(() => {
             players[player.id].invincible = false;
+            socket.emit('updateInvincibility', { id: player.id, invincible: false });
         }, invincibilityDuration);
+        drawPlayers();
+    }
+});
+
+socket.on('updateInvincibility', (data) => {
+    if (players[data.id]) {
+        players[data.id].invincible = data.invincible;
         drawPlayers();
     }
 });
@@ -73,21 +82,39 @@ document.getElementById('startGameButton').addEventListener('click', () => {
 });
 
 function handleKeyDown(event) {
-    keysPressed[event.key] = true;
-    handleMovement();
-    if (event.key === ' ') {
-        shoot();
+    if (players[socket.id] && !players[socket.id].invincible) {
+        keysPressed[event.key] = true;
+        handleMovement();
+        if (event.key === ' ') {
+            shoot();
+        }
     }
 }
 
 function handleKeyUp(event) {
-    delete keysPressed[event.key];
-    handleMovement();
+    if (players[socket.id] && !players[socket.id].invincible) {
+        delete keysPressed[event.key];
+        handleMovement();
+    }
 }
 
-function startGame(x, y) {
-    players[socket.id] = { x, y, angle: 0, invincible: false };
+function startGame(x, y, isFirstTime) {
+    players[socket.id] = { x, y, angle: 0, invincible: isFirstTime };
     drawPlayers();
+    if (isFirstTime) {
+        let countdown = preparationDuration / 1000;
+        const countdownInterval = setInterval(() => {
+            countdown -= 1;
+            document.getElementById('welcomeMessage').innerText = `Game starts in ${countdown} seconds!`;
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                players[socket.id].invincible = false;
+                socket.emit('updateInvincibility', { id: socket.id, invincible: false });
+                document.getElementById('welcomeMessage').innerText = '';
+            }
+            drawPlayers();
+        }, 1000);
+    }
 }
 
 function drawPlayers() {
@@ -130,7 +157,7 @@ function drawBullet(x, y) {
 
 function handleMovement() {
     const player = players[socket.id];
-    if (!player) return;
+    if (!player || player.invincible) return;
 
     const movement = { dx: 0, dy: 0, angle: player.angle };
     const speed = 5;
@@ -174,7 +201,7 @@ function handleMovement() {
 
 function shoot() {
     const player = players[socket.id];
-    if (player) {
+    if (player && !player.invincible) {
         const bullet = {
             x: player.x,
             y: player.y,
