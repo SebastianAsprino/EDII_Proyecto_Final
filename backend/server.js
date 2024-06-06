@@ -11,8 +11,8 @@ const players = {};
 const bullets = [];
 const canvasWidth = 1024;
 const canvasHeight = 500;
-const invincibilityDuration = 5000; // 5 segundos para reaparición
-const preparationDuration = 10000; // 10 segundos para preparación inicial
+const invincibilityDuration = 5000; 
+const preparationDuration = 10000; 
 
 // Servir archivos estáticos desde la carpeta 'frontend'
 app.use(express.static(join(__dirname, '../frontend')));
@@ -24,36 +24,36 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
   console.log('A user connected');
 
-  // Username
+
   socket.emit('requestUsername');
 
-  // Listen for the username from the client
+ 
   socket.on('sendUsername', (username) => {
     console.log('Username received: ' + username);
     socket.username = username;
 
-    // Assign a random position to the player
+    
     const x = Math.random() * canvasWidth; 
     const y = Math.random() * canvasHeight;
     players[socket.id] = { username, x, y, angle: 0, invincible: true, points: 0  };
 
-    // Player pos
+    
     socket.emit('welcome', { message: `Welcome to the game, ${username}!`, x, y });
 
-    // Notify other players about the new player
+    
     socket.broadcast.emit('newPlayer', { id: socket.id, username, x, y, angle: 0, invincible: true, points: 0  });
 
-    // Send existing players to the new player
+    
     socket.emit('existingPlayers', players);
 
-    // Handle invincibility timer
+    
     setTimeout(() => {
       players[socket.id].invincible = false;
       io.emit('updateInvincibility', { id: socket.id, invincible: false });
     }, preparationDuration);
   });
 
-  // Handle movement
+  
   socket.on('move', (movement) => {
     if (players[socket.id] && !players[socket.id].invincible) {
       const player = players[socket.id];
@@ -65,13 +65,13 @@ io.on('connection', (socket) => {
         players[socket.id].y = newY;
         players[socket.id].angle = movement.angle;
 
-        // Notify all clients about the player's new position
+        
         io.emit('playerMoved', { id: socket.id, x: newX, y: newY, angle: movement.angle });
       }
     }
   });
 
-  // Handle shooting
+  
   socket.on('shoot', (bullet) => {
     if (players[socket.id] && !players[socket.id].invincible) {
       bullets.push(bullet);

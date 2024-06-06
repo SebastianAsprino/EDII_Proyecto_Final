@@ -7,6 +7,10 @@
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
+    <audio autoplay loop>
+        <source src="sources/Musica_naval.ogg" type="audio/ogg">
+        Tu navegador no soporta la reproducción de audio.
+    </audio>
     <div id="welcomeMessage">Bienvenido a Barcos PvP</div>
     <div id="gameOptions" style="display:none;">
         <label for="playerName">Nombre de navio:</label>
@@ -16,9 +20,6 @@
     <canvas id="gameCanvas" width="1024" height="500" style="border:1px solid #fff4f4;"></canvas>
     <script src="/socket.io/socket.io.js"></script>
     <script src="index.js"></script>
-    <audio autoplay loop>
-        <source src="../sources/fondo.png" type="audio/mp3">
-        Tu navegador no soporta la reproducción de audio.
-    </audio>
+
 </body>
 </html>
