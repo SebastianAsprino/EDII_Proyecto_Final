@@ -1,7 +1,7 @@
 body {
     margin: 0;
     font-family: Arial, sans-serif;
-    background-image: url('../sources/fondo3.png');
+    background-image: url('../sources/fondo.png');
     background-size: cover;
     display: flex;
     flex-direction: column;
@@ -50,6 +50,6 @@ button:hover {
 
 
 #gameCanvas {
-    border: 1px solid #000;
+    border: 1px solid #e70303;
     display: none;
 }

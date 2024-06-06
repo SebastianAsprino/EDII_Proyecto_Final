@@ -2,6 +2,19 @@ const socket = io();
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+canvas.style.backgroundColor = '#f0f0f0';
+canvas.style.backgroundImage = "url('../sources/fondo1.gif')";
+
+canvas.style.backgroundSize = 'cover';  // Asegura que la imagen cubra todo el canvas
+canvas.style.backgroundPosition = 'center';  // Centra la imagen en el canvas
+canvas.style.backgroundRepeat = 'no-repeat';  // Evita que la imagen se repita
+
+const playerImage = new Image();
+playerImage.src = '../sources/barco.png';
+
+const bulletImage = new Image();
+bulletImage.src = '../sources/bala.png';
+
 let players = {};
 let bullets = [];
 let myId;
@@ -86,7 +99,7 @@ socket.on('updateInvincibility', (data) => {
 socket.on('updatePoints', (data) => {
     if (players[data.id]) {
         players[data.id].points = data.points;
-        document.getElementById('points').innerText = `Points: ${players[myId].points}`;
+        drawPlayers();
     }
 });
 
@@ -159,25 +172,23 @@ function drawShip(x, y, username, angle, invincible) {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
-    ctx.fillStyle = invincible ? 'rgba(0, 0, 255, 0.5)' : 'blue';
-    ctx.beginPath();
-    ctx.moveTo(0, -10);
-    ctx.lineTo(-10, 10);
-    ctx.lineTo(10, 10);
-    ctx.closePath();
-    ctx.fill();
+    ctx.globalAlpha = invincible ? 0.5 : 1.0;  // Establecer transparencia si es invencible
+
+    // Dibujar la imagen del jugador
+    ctx.drawImage(playerImage, -playerImage.width / 2, -playerImage.height / 2);
+
     ctx.restore();
 
+    // Dibujar el nombre del jugador
     ctx.fillStyle = 'white';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(username, x, y - 20);
 }
-
 function drawBullet(x, y) {
-    ctx.fillStyle = 'red';
+    ctx.fillStyle = 'black';
     ctx.beginPath();
-    ctx.arc(x, y, 2, 0, 2 * Math.PI);
+    ctx.arc(x, y, 10, 0, 10 * Math.PI);
     ctx.fill();
 }
 

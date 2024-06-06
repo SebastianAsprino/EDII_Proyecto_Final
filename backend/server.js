@@ -35,13 +35,13 @@ io.on('connection', (socket) => {
     // Assign a random position to the player
     const x = Math.random() * canvasWidth; 
     const y = Math.random() * canvasHeight;
-    players[socket.id] = { username, x, y, angle: 0, invincible: true };
+    players[socket.id] = { username, x, y, angle: 0, invincible: true, points: 0  };
 
     // Player pos
     socket.emit('welcome', { message: `Welcome to the game, ${username}!`, x, y });
 
     // Notify other players about the new player
-    socket.broadcast.emit('newPlayer', { id: socket.id, username, x, y, angle: 0, invincible: true });
+    socket.broadcast.emit('newPlayer', { id: socket.id, username, x, y, angle: 0, invincible: true, points: 0  });
 
     // Send existing players to the new player
     socket.emit('existingPlayers', players);
@@ -86,34 +86,40 @@ io.on('connection', (socket) => {
 });
 
 setInterval(() => {
-  bullets.forEach((bullet, bulletIndex) => {
-    bullet.x += bullet.dx;
-    bullet.y += bullet.dy;
+    bullets.forEach((bullet, bulletIndex) => {
+        bullet.x += bullet.dx;
+        bullet.y += bullet.dy;
 
-    for (const playerId in players) {
-      const player = players[playerId];
-      if (!player.invincible && bullet.id !== playerId) {
-        const dist = Math.hypot(player.x - bullet.x, player.y - bullet.y);
-        if (dist < 10) { // collision detected
-          io.emit('playerRespawned', { id: playerId, x: player.x, y: player.y });
-          players[playerId].invincible = true;
-          setTimeout(() => {
-            players[playerId].invincible = false;
-            io.emit('updateInvincibility', { id: playerId, invincible: false });
-          }, invincibilityDuration);
+        for (const playerId in players) {
+            const player = players[playerId];
+            if (!player.invincible && bullet.id !== playerId) {
+                const dist = Math.hypot(player.x - bullet.x, player.y - bullet.y);
+                if (dist < 18) { // Colisión detectada
+                    // Incrementar puntos para el jugador que disparó la bala
+                    if (players[bullet.id]) {
+                        players[bullet.id].points += 1;
+                        io.emit('updatePoints', { id: bullet.id, points: players[bullet.id].points });
+                    }
 
-          bullets.splice(bulletIndex, 1);
-          break;
+                    io.emit('playerRespawned', { id: playerId, x: player.x, y: player.y });
+                    players[playerId].invincible = true;
+                    setTimeout(() => {
+                        players[playerId].invincible = false;
+                        io.emit('updateInvincibility', { id: playerId, invincible: false });
+                    }, invincibilityDuration);
+
+                    bullets.splice(bulletIndex, 1);
+                    break;
+                }
+            }
         }
-      }
-    }
 
-    if (bullet.x < 0 || bullet.x > canvasWidth || bullet.y < 0 || bullet.y > canvasHeight) {
-      bullets.splice(bulletIndex, 1);
-    }
-  });
+        if (bullet.x < 0 || bullet.x > canvasWidth || bullet.y < 0 || bullet.y > canvasHeight) {
+            bullets.splice(bulletIndex, 1);
+        }
+    });
 
-  io.emit('updateBullets', bullets);
+    io.emit('updateBullets', bullets);
 }, 1000 / 60);
 
 server.listen(3000, () => {
