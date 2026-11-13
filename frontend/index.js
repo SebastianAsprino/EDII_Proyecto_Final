@@ -3,42 +3,42 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 canvas.style.backgroundColor = '#f0f0f0';
-canvas.style.backgroundImage = "url('../sources/fondo1.gif')";
+canvas.style.backgroundImage = "url('sources/fondo1.gif')";
 
 canvas.style.backgroundSize = 'cover';  // Asegura que la imagen cubra todo el canvas
 canvas.style.backgroundPosition = 'center';  // Centra la imagen en el canvas
 canvas.style.backgroundRepeat = 'no-repeat';  // Evita que la imagen se repita
 
 const playerImage = new Image();
-playerImage.src = '../sources/barco.png';
-
-const bulletImage = new Image();
-bulletImage.src = '../sources/bala.png';
+playerImage.src = 'sources/barco.png';
 
 let players = {};
 let bullets = [];
-let myId;
 const keysPressed = {};
-const invincibilityDuration = 5000; // 5 segundos para reaparición
 const preparationDuration = 10000; // 10 segundos para preparación inicial
-
+const SHIP_SPEED = 3;
+const BULLET_SPEED = 10;
+const BULLET_RADIUS = 10;
+const DIAGONAL_FACTOR = Math.SQRT1_2;
 
 socket.on('requestUsername', () => {
     document.getElementById('gameOptions').style.display = 'block';
 });
 
 document.getElementById('startGameButton').addEventListener('click', () => {
-    const username = document.getElementById('playerName').value;
-    if (username) {
-        socket.emit('sendUsername', username);
-        document.getElementById('gameOptions').style.display = 'none';
-    } else {
+    const username = document.getElementById('playerName').value.trim();
+    if (!username) {
         alert('Please enter a username.');
+        return;
     }
+    socket.emit('sendUsername', username);
+    document.getElementById('gameOptions').style.display = 'none';
+    canvas.style.display = 'block';
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 });
 
 socket.on('welcome', (data) => {
-    myId = socket.id;
     document.getElementById('welcomeMessage').innerText = data.message;
     startGame(data.x, data.y, true);
 });
@@ -67,24 +67,17 @@ socket.on('playerMoved', (player) => {
     }
 });
 
-socket.on('bulletShot', (bullet) => {
-    bullets.push(bullet);
-});
-
 socket.on('updateBullets', (serverBullets) => {
     bullets = serverBullets;
     drawPlayers();
 });
 
+// El servidor avisa con 'updateInvincibility' cuando termina la invencibilidad.
 socket.on('playerRespawned', (player) => {
     if (players[player.id]) {
         players[player.id].x = player.x;
         players[player.id].y = player.y;
         players[player.id].invincible = true;
-        setTimeout(() => {
-            players[player.id].invincible = false;
-            socket.emit('updateInvincibility', { id: player.id, invincible: false });
-        }, invincibilityDuration);
         drawPlayers();
     }
 });
@@ -101,13 +94,6 @@ socket.on('updatePoints', (data) => {
         players[data.id].points = data.points;
         drawPlayers();
     }
-});
-
-document.getElementById('startGameButton').addEventListener('click', () => {
-    document.getElementById('gameOptions').style.display = 'none';
-    canvas.style.display = 'block';
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
 });
 
 function handleKeyDown(event) {
@@ -137,8 +123,7 @@ function startGame(x, y, isFirstTime) {
             document.getElementById('welcomeMessage').innerText = `Game starts in ${countdown} seconds!`;
             if (countdown <= 0) {
                 clearInterval(countdownInterval);
-                players[socket.id].invincible = false;
-                socket.emit('updateInvincibility', { id: socket.id, invincible: false });
+                if (players[socket.id]) players[socket.id].invincible = false;
                 document.getElementById('welcomeMessage').innerText = '';
             }
             drawPlayers();
@@ -162,10 +147,10 @@ function drawPlayers() {
     ctx.textAlign = 'left';
     let yOffset = 20;
     for (const id in players) {
-    const player = players[id];
-    ctx.fillText(`${player.username}: ${player.points} points`, 10, yOffset);
-    yOffset += 20;
-}
+        const player = players[id];
+        ctx.fillText(`${player.username}: ${player.points} points`, 10, yOffset);
+        yOffset += 20;
+    }
 }
 
 function drawShip(x, y, username, angle, invincible) {
@@ -185,10 +170,11 @@ function drawShip(x, y, username, angle, invincible) {
     ctx.textAlign = 'center';
     ctx.fillText(username, x, y - 20);
 }
+
 function drawBullet(x, y) {
     ctx.fillStyle = 'black';
     ctx.beginPath();
-    ctx.arc(x, y, 10, 0, 10 * Math.PI);
+    ctx.arc(x, y, BULLET_RADIUS, 0, 2 * Math.PI);
     ctx.fill();
 }
 
@@ -197,7 +183,7 @@ function handleMovement() {
     if (!player || player.invincible) return;
 
     const movement = { dx: 0, dy: 0, angle: player.angle };
-    const speed = 3;
+    const speed = SHIP_SPEED;
 
     if (keysPressed['ArrowUp']) {
         movement.dy -= speed;
@@ -217,8 +203,8 @@ function handleMovement() {
     }
 
     if ((keysPressed['ArrowUp'] || keysPressed['ArrowDown']) && (keysPressed['ArrowLeft'] || keysPressed['ArrowRight'])) {
-        movement.dx *= 0.7071;
-        movement.dy *= 0.7071;
+        movement.dx *= DIAGONAL_FACTOR;
+        movement.dy *= DIAGONAL_FACTOR;
         if (keysPressed['ArrowUp'] && keysPressed['ArrowLeft']) movement.angle = -Math.PI / 4;
         if (keysPressed['ArrowUp'] && keysPressed['ArrowRight']) movement.angle = Math.PI / 4;
         if (keysPressed['ArrowDown'] && keysPressed['ArrowLeft']) movement.angle = -3 * Math.PI / 4;
@@ -242,8 +228,8 @@ function shoot() {
         const bullet = {
             x: player.x,
             y: player.y,
-            dx: Math.cos(player.angle) * 10,
-            dy: Math.sin(player.angle) * 10,
+            dx: Math.cos(player.angle) * BULLET_SPEED,
+            dy: Math.sin(player.angle) * BULLET_SPEED,
             id: socket.id,
         };
         socket.emit('shoot', bullet);
